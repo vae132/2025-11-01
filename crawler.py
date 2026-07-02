@@ -9,6 +9,7 @@ import hashlib
 import requests
 from bs4 import BeautifulSoup
 import datetime  # 用于解析发布时间
+from urllib.parse import urljoin, urlsplit, urlunsplit, parse_qsl, urlencode, unquote
 
 # =================== 配置项 ===================
 BASE_URL = "https://andylee.pro/wp/"
@@ -419,10 +420,12 @@ def update_new_articles():
 
     local_articles = load_all_local_articles()
     first_local_url = local_articles[0]["article_url"] if local_articles else None
+    first_local_url_key = normalize_url_for_match(first_local_url) if first_local_url else None
 
     new_count = 0
     for link in website_links:
-        if link == first_local_url:
+        # URL 做规范化后再比较，避免尾部斜杠、#comment、追踪参数造成误判
+        if normalize_url_for_match(link) == first_local_url_key:
             break
         new_count += 1
 
@@ -462,19 +465,141 @@ def update_new_articles():
     merged_articles = new_articles + local_articles
     reassign_and_save_articles(merged_articles)
 
-# =================== 近期留言更新（按文章标题和发布时间匹配） ===================
+# =================== 近期留言更新（优先按 URL 匹配，标题时间兜底） ===================
+
+def normalize_url_for_match(url):
+    """
+    将文章 URL 规范化，用于本地 JSON 匹配。
+
+    为什么要这样做：
+    WordPress 的“近期评论”链接经常长这样：
+        https://andylee.pro/wp/xxx/#comment-123
+        https://andylee.pro/wp/xxx/?replytocom=123#respond
+    但本地 JSON 里保存的 article_url 可能是：
+        https://andylee.pro/wp/xxx/
+
+    如果直接用字符串 == 比较，就会匹配失败。
+    这里会：
+    1. 去掉 #comment / #respond 这类 fragment；
+    2. 去掉 replytocom、utm、fbclid、gclid 等无关参数；
+    3. 统一大小写、URL 编码、尾部斜杠；
+    4. 支持相对链接转绝对链接。
+    """
+    if not url:
+        return ""
+
+    url = str(url).strip()
+    url = urljoin(BASE_URL, url)
+
+    parts = urlsplit(url)
+    scheme = (parts.scheme or "https").lower()
+    netloc = parts.netloc.lower()
+
+    # 有些地方可能带 www，有些不带，统一去掉 www.
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+
+    # 解码路径，去掉尾部斜杠；根路径不要变成空
+    path = unquote(parts.path or "")
+    path = re.sub(r"/+/", "/", path)
+    if len(path) > 1:
+        path = path.rstrip("/")
+
+    # 保留真正能定位文章的参数，例如 p=123；去掉评论、追踪参数
+    keep_params = []
+    for k, v in parse_qsl(parts.query, keep_blank_values=True):
+        lk = k.lower()
+        if lk == "replytocom":
+            continue
+        if lk.startswith("utm_"):
+            continue
+        if lk in {"fbclid", "gclid", "mc_cid", "mc_eid"}:
+            continue
+        keep_params.append((k, v))
+    query = urlencode(keep_params, doseq=True)
+
+    # fragment 直接丢掉：#comment-123 不应该影响文章匹配
+    return urlunsplit((scheme, netloc, path, query, ""))
+
+
+def normalize_title_for_match(title):
+    """
+    标题兜底匹配用：只做轻度规范化。
+    注意：真正可靠的是 URL；标题可能被管理员修改，所以标题只能做兜底。
+    """
+    title = str(title or "")
+    try:
+        title = title.normalize("NFKC")
+    except Exception:
+        pass
+    title = re.sub(r"\s+", "", title)
+    return title.strip().lower()
+
+
+def find_matching_local_article(local_articles, fixed_articles, title, url, new_article_time=""):
+    """
+    查找近期评论对应的本地 JSON 文章。
+
+    新逻辑：
+    1. 先用规范化 URL 匹配，这是最可靠的。管理员改标题也不怕。
+    2. URL 找不到，再用【标题 + 发布时间】兜底。
+    3. 还找不到，再用【规范化标题 + 发布时间】兜底。
+    """
+    target_url_key = normalize_url_for_match(url)
+    target_title_key = normalize_title_for_match(title)
+
+    # 1）优先 URL 匹配：先找 data/page，再找 data/fixed
+    for article in local_articles:
+        local_url_key = normalize_url_for_match(article.get("article_url", ""))
+        if local_url_key and local_url_key == target_url_key:
+            return article, "常规页面", "URL匹配"
+
+    for article in fixed_articles:
+        local_url_key = normalize_url_for_match(article.get("article_url", ""))
+        if local_url_key and local_url_key == target_url_key:
+            return article, "固定页面", "URL匹配"
+
+    # 2）URL 没找到，再用原来的：标题 + 发布时间
+    if new_article_time:
+        for article in local_articles:
+            if article.get("title", "") == title and article.get("article_time", "") == new_article_time:
+                return article, "常规页面", "标题+发布时间匹配"
+
+        for article in fixed_articles:
+            if article.get("title", "") == title and article.get("article_time", "") == new_article_time:
+                return article, "固定页面", "标题+发布时间匹配"
+
+    # 3）再兜底：规范化标题 + 发布时间，解决空格、全角半角差异
+    if new_article_time and target_title_key:
+        for article in local_articles:
+            if normalize_title_for_match(article.get("title", "")) == target_title_key and article.get("article_time", "") == new_article_time:
+                return article, "常规页面", "规范化标题+发布时间匹配"
+
+        for article in fixed_articles:
+            if normalize_title_for_match(article.get("title", "")) == target_title_key and article.get("article_time", "") == new_article_time:
+                return article, "固定页面", "规范化标题+发布时间匹配"
+
+    return None, "", ""
 
 def get_recent_comment_articles_collection(retries=5):
     """
-    直接爬取整个近期评论区域，提取每条评论中涉及的文章标题和链接，
-    并构造一个字典，键为文章标题，值为对应的文章链接。
-    假设近期评论区域在 <aside id="recent-comments-5"> 内，
-    每个评论项在 <li class="recentcomments"> 中，
-    且文章链接在该 li 中的第二个 <a> 标签内（如果存在多个 <a> 标签，否则为第一个）。
-    给予最多 retries 次机会
+    直接爬取整个近期评论区域，提取每条评论中涉及的文章标题和链接。
+
+    返回值从原来的 dict 改成 list：
+        [
+            {"title": "文章标题", "url": "文章链接"},
+            ...
+        ]
+
+    为什么不用 dict：
+    1. dict 用标题当 key，如果标题重复，会互相覆盖；
+    2. 管理员改标题后，标题本身不可靠；
+    3. 我们真正应该用 URL 去匹配本地 JSON。
     """
     url = BASE_URL  # 以首页为例
     attempt = 0
+    response = None
+
     while attempt < retries:
         try:
             response = requests.get(url, headers=HEADERS, timeout=10)
@@ -486,116 +611,161 @@ def get_recent_comment_articles_collection(retries=5):
             print(f"❌ 获取近期评论区域出错：{e}, 尝试第 {attempt} 次")
             if attempt == retries:
                 print("❌ 5 次尝试后仍无法获取近期评论区域")
-                return {}
+                return []
             time.sleep(2)
+
     soup = BeautifulSoup(response.text, "html.parser")
     recent_comments = soup.find("aside", id="recent-comments-5")
     if not recent_comments:
         print("✅ 未找到近期评论区域")
-        return {}
-    title_to_link = {}
+        return []
+
+    articles = []
+    seen_url_keys = set()
     comment_items = recent_comments.find_all("li", class_="recentcomments")
+
     for li in comment_items:
         a_tags = li.find_all("a", href=True)
-        # 如果有两个或更多链接，取第二个为文章标题链接；否则取第一个
+
+        # WordPress 默认近期评论通常是：作者链接 + 文章链接
+        # 所以有两个或更多 a 标签时，第二个一般是文章链接。
+        # 如果只有一个 a 标签，就只能取第一个。
         if len(a_tags) >= 2:
             a_tag = a_tags[1]
         elif a_tags:
             a_tag = a_tags[0]
         else:
             continue
+
         title = a_tag.get_text(strip=True)
         link = a_tag["href"]
-        if title not in title_to_link:
-            title_to_link[title] = link
-    return title_to_link
+        url_key = normalize_url_for_match(link)
+
+        # 同一篇文章可能有多条近期评论，去重即可，避免重复爬取同一篇文章。
+        if url_key in seen_url_keys:
+            continue
+
+        seen_url_keys.add(url_key)
+        articles.append({
+            "title": title,
+            "url": link,
+            "url_key": url_key
+        })
+
+    return articles
+
 
 def update_recent_comments_by_title():
     """
-    对于近期留言中涉及的文章，
-    先爬取整个近期评论区域得到【标题, 链接】集合，
-    然后在本地数据中根据标题和文章发布时间查找对应文章（先在 data/page 中查找，若找不到再在 data/fixed 中查找），
-    如果找到则重新爬取该文章的数据（包括标题、正文、发布时间和评论），
-    只有当爬取到的数据有效时才更新，否则保留原数据。
-    如果爬取到的文章发布时间为空，则退回到用文章 URL 进行匹配。
+    对近期留言涉及的文章进行更新。
+
+    修改后的匹配顺序：
+    1. 先用 URL 匹配本地 JSON 文件，并且 URL 会先规范化；
+       这样管理员修改标题后，也能找到本地文章。
+    2. URL 找不到时，再用【标题 + 发布时间】兜底。
+    3. 还找不到，再用【规范化标题 + 发布时间】兜底。
+
+    找到本地文章后，重新爬取标题、正文、发布时间和评论，
+    然后写回 match_found["filename"] 对应的本地 JSON 文件。
     """
-    print("开始检查近期留言更新（按文章标题和发布时间匹配）……")
-    title_to_url = get_recent_comment_articles_collection()
-    if not title_to_url:
+    print("开始检查近期留言更新（优先 URL 匹配，标题和发布时间兜底）……")
+
+    recent_articles = get_recent_comment_articles_collection()
+    if not recent_articles:
         print("近期留言未获取到有效的文章数据。")
         return
 
-    local_articles = load_all_local_articles()  # data/page 下的文章
+    local_articles = load_all_local_articles()    # data/page 下的文章
     fixed_articles = load_fixed_articles()        # data/fixed 下的文章
     updated = 0
-    for title, url in title_to_url.items():
-        # 先获取网页上最新的发布时间，用于匹配
+
+    for item in recent_articles:
+        title = item.get("title", "")
+        url = item.get("url", "")
+        target_url_key = normalize_url_for_match(url)
+
+        print(f"\n🔎 正在处理近期留言文章：{title}")
+        print(f"   原始链接：{url}")
+        print(f"   规范链接：{target_url_key}")
+
+        # 先获取网页上最新的发布时间，给标题时间兜底匹配使用。
+        # 注意：如果 URL 已经能匹配成功，标题改了也没关系。
         new_article_time = get_article_time(url, old_time="")
-        match_found = None
-        location = ""
-        # 如果爬取到发布时间，则同时匹配标题和发布时间
-        if new_article_time:
-            for article in local_articles:
-                if article["title"] == title and article.get("article_time", "") == new_article_time:
-                    match_found = article
-                    location = "常规页面"
-                    break
-            if not match_found:
-                for article in fixed_articles:
-                    if article["title"] == title and article.get("article_time", "") == new_article_time:
-                        match_found = article
-                        location = "固定页面"
-                        break
-        # 如果发布时间为空或匹配失败，则退回到使用 URL 进行匹配
-        if not match_found:
-            for article in local_articles:
-                if article.get("article_url", "") == url:
-                    match_found = article
-                    location = "常规页面"
-                    break
-            if not match_found:
-                for article in fixed_articles:
-                    if article.get("article_url", "") == url:
-                        match_found = article
-                        location = "固定页面"
-                        break
+
+        match_found, location, match_method = find_matching_local_article(
+            local_articles=local_articles,
+            fixed_articles=fixed_articles,
+            title=title,
+            url=url,
+            new_article_time=new_article_time
+        )
+
         if match_found:
             if location == "常规页面":
-                print(f"📌 正在爬取第 {match_found.get('page', '?')} 页 第 {match_found.get('order', '?')} 篇文章：{title}")
+                print(
+                    f"📌 找到本地文章：第 {match_found.get('page', '?')} 页 "
+                    f"第 {match_found.get('order', '?')} 篇，匹配方式：{match_method}"
+                )
             else:
-                print(f"📌 正在爬取固定页面：{title}")
-            new_title = get_article_title(url, old_title=match_found["title"])
+                print(f"📌 找到固定页面文章，匹配方式：{match_method}")
+
+            old_local_title = match_found.get("title", "")
+            if old_local_title != title:
+                print(f"   本地旧标题：{old_local_title}")
+                print(f"   近期区标题：{title}")
+
+            # 重新爬取标题
+            new_title = get_article_title(url, old_title=match_found.get("title"))
             if new_title != "未知标题":
                 match_found["title"] = new_title
             else:
-                print(f"❌ 标题爬取失败，保留原有标题：{match_found['title']}")
+                print(f"❌ 标题爬取失败，保留原有标题：{match_found.get('title', '')}")
+
+            # 重新爬取正文
             new_content = get_article_content(url, old_content=match_found.get("content"))
             if new_content != "未知内容":
                 match_found["content"] = new_content
             else:
-                print(f"❌ 正文爬取失败，保留原有内容")
+                print("❌ 正文爬取失败，保留原有内容")
+
+            # 重新爬取发布时间
             new_time = get_article_time(url, old_time=match_found.get("article_time"))
             if new_time:
                 match_found["article_time"] = new_time
             else:
-                print(f"❌ 发布时间爬取失败，保留原有发布时间")
+                print("❌ 发布时间爬取失败，保留原有发布时间")
+
+            # 重新爬取评论
             new_comments = get_comments(url)
             if new_comments is None:
                 print(f"❌ 评论爬取失败：{title}，保留原有评论")
             else:
                 match_found["comments"] = new_comments
                 match_found["timestamp"] = time.time()
+
+            # 为了以后更稳，顺手保存规范化后的 URL；但不强行替换成本次带 #comment 的链接
+            # 如果原 article_url 为空，则补上去。
+            if not match_found.get("article_url"):
+                match_found["article_url"] = target_url_key
+
             try:
                 with open(match_found["filename"], "w", encoding="utf-8") as f:
                     json.dump(match_found, f, ensure_ascii=False, indent=2)
-                print(f"✅ 更新完成：{location} - {match_found['title']}")
+                print(f"✅ 更新完成：{location} - {match_found.get('title', '')}")
+                print(f"   写回文件：{match_found['filename']}")
                 updated += 1
             except Exception as e:
-                print(f"❌ 保存更新失败（标题：{match_found['title']}）：{e}")
+                print(f"❌ 保存更新失败（标题：{match_found.get('title', '')}）：{e}")
+
             time.sleep(2)
         else:
-            print(f"❌ 未在本地数据中找到匹配文章（标题及发布时间不匹配）：{title}")
-    print(f"✅ 近期留言按标题和发布时间匹配更新完成，共更新 {updated} 篇文章。")
+            print(f"❌ 未在本地数据中找到匹配文章：{title}")
+            print(f"   已尝试 URL 匹配、标题+发布时间匹配、规范化标题+发布时间匹配")
+            print(f"   近期区 URL：{url}")
+            print(f"   规范化 URL：{target_url_key}")
+            print(f"   网页发布时间：{new_article_time or '空'}")
+
+    print(f"\n✅ 近期留言更新完成，共更新 {updated} 篇文章。")
 
 # =================== 主更新流程 ===================
 

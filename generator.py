@@ -134,6 +134,7 @@ def generate_html(articles, result_file="index.html"):
       --heading-size: calc(var(--font-size) * 1.375);
       --btn-bg: #667eea;
       --btn-hover: #556cd6;
+      --content-width: 960px;
     }}
     /* 基础重置 */
     * {{
@@ -255,7 +256,7 @@ def generate_html(articles, result_file="index.html"):
     .search-controls {{
       margin: 20px auto;
       text-align: center;
-      max-width: 800px;
+      max-width: var(--content-width);
       padding: 0 10px;
     }}
     .search-controls select,
@@ -307,7 +308,7 @@ def generate_html(articles, result_file="index.html"):
       margin: 20px auto;
       padding: 10px;
       border-bottom: 1px solid #ccc;
-      max-width: 800px;
+      max-width: var(--content-width);
     }}
     .article-header h2 {{ margin-bottom: 10px; font-size: var(--heading-size); }}
     .article-time {{
@@ -329,7 +330,7 @@ def generate_html(articles, result_file="index.html"):
       color: white;
     }}
     .article-content {{
-      max-width: 800px;
+      max-width: var(--content-width);
       margin: 20px auto;
       padding: 10px;
       font-size: var(--font-size);
@@ -353,7 +354,7 @@ def generate_html(articles, result_file="index.html"):
     }}
     /* 分界线及标题 */
     .article-divider {{
-      max-width: 800px;
+      max-width: var(--content-width);
       margin: 20px auto;
       text-align: center;
     }}
@@ -373,7 +374,7 @@ def generate_html(articles, result_file="index.html"):
       margin: 15px auto;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      max-width: 800px;
+      max-width: var(--content-width);
       transition: background-color 0.3s;
       cursor: pointer;
       background-color: var(--background-color);
@@ -462,7 +463,7 @@ def generate_html(articles, result_file="index.html"):
       list-style-type: none;
       padding: 0;
       margin: 20px auto;
-      max-width: 800px;
+      max-width: var(--content-width);
     }}
     .search-result-item {{
       background-color: white;
@@ -545,6 +546,99 @@ body.dark-mode .dropdown-hint {{
     }}
     .back-to-top:hover {{
       background-color: var(--btn-hover);
+    }}
+
+    /* 电脑端右侧悬浮工具栏：可隐藏 + 默认半透明，避免遮挡阅读 */
+    .side-tools {{
+      position: fixed;
+      right: 18px;
+      top: 160px;
+      width: 132px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      opacity: 0.38;                 /* 默认半透明，盖到文字也不太影响阅读 */
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }}
+    .side-tools:hover,
+    .side-tools:focus-within {{
+      opacity: 0.96;                 /* 鼠标移上去才变清晰，方便点击 */
+    }}
+    .side-tools-panel {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+    .side-tools-title {{
+      text-align: center;
+      font-size: 13px;
+      color: #777;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(221,221,221,0.7);
+      border-radius: 12px;
+      padding: 8px 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      backdrop-filter: blur(4px);
+    }}
+    .side-tools button {{
+      width: 100%;
+      padding: 10px 8px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(102, 126, 234, 0.78);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      transition: background-color 0.3s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      backdrop-filter: blur(4px);
+    }}
+    .side-tools button:hover {{
+      background: var(--btn-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }}
+    .side-tools-toggle {{
+      width: 100% !important;
+      padding: 8px 6px !important;
+      font-size: 13px !important;
+      background: rgba(0, 150, 136, 0.85) !important;
+    }}
+    .side-tools.collapsed {{
+      width: 44px;
+      opacity: 0.58;
+    }}
+    .side-tools.collapsed .side-tools-panel {{
+      display: none;
+    }}
+    .side-tools.collapsed .side-tools-toggle {{
+      width: 44px !important;
+      height: 44px;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      font-size: 18px !important;
+    }}
+    body.dark-mode .side-tools-title {{
+      background: rgba(43,43,43,0.72);
+      color: #ccc;
+      border-color: rgba(68,68,68,0.7);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }}
+    body.dark-mode .side-tools button {{
+      background: rgba(92, 113, 211, 0.78) !important;
+      color: #fff !important;
+    }}
+    body.dark-mode .side-tools button:hover {{
+      background: #4D61C1 !important;
+    }}
+    body.dark-mode .side-tools-toggle {{
+      background: rgba(0, 121, 107, 0.9) !important;
+    }}
+    @media (max-width: 1200px) {{
+      .side-tools {{
+        display: none;
+      }}
     }}
 
     /* ---------------- 暗黑模式 ---------------- */
@@ -686,7 +780,7 @@ body.dark-mode .dropdown-hint {{
       }}
       #articleComments.layout-list .comment {{
           margin: 10px auto !important;
-          max-width: 800px;
+          max-width: var(--content-width);
       }}
     }}
     #articleComments.layout-list .comment.highlighted-comment,
@@ -807,6 +901,23 @@ body.dark-mode .dropdown-hint {{
     </button>
   </div>
   <button class="back-to-top" onclick="scrollToTop()">↑</button>
+
+  <!-- 电脑端右侧悬浮工具栏：可隐藏，默认半透明 -->
+  <div class="side-tools" id="sideTools" aria-label="页面快捷工具">
+    <button type="button" class="side-tools-toggle" onclick="toggleSideTools()" title="隐藏/展开快捷工具">
+      ◀
+    </button>
+
+    <div class="side-tools-panel">
+      <div class="side-tools-title">快捷工具</div>
+      <button type="button" onclick="focusSearchBox()">🔍 搜索</button>
+      <button type="button" onclick="scrollToArticleSelector()">📄 选文章</button>
+      <button type="button" onclick="prevArticle()">⬅️ 上一篇</button>
+      <button type="button" onclick="nextArticle()">下一篇 ➡️</button>
+      <button type="button" onclick="scrollToTop()">↑ 返回顶部</button>
+    </div>
+  </div>
+
   <!-- 设置面板（Modal） -->
   <div id="settingsModal" class="modal">
     <div class="modal-content">
@@ -899,9 +1010,9 @@ body.dark-mode .dropdown-hint {{
     var filterSpecialAuthors = false; // false：全部结果；true：只显示作者为 "李宗恩" 或 "andy"
 
     /* ---------------- 辅助函数 ---------------- */
-    
-    
-        
+
+
+
     // 1) 归一化：和你的搜索规则保持一致（NFKC + 繁转简 + 小写）
     function norm(s='') {{
       try {{ s = s.normalize('NFKC'); }} catch(e) {{}}
@@ -909,7 +1020,7 @@ body.dark-mode .dropdown-hint {{
       s = s.toLowerCase();
       return s;
     }}
-    
+
     // 2) 把原文本逐字归一化，同时建立“归一化串索引 -> 原文下标”的映射
     function buildNormIndexMap(raw) {{
       const map = [];     // map[normIndex] = originalIndex
@@ -924,7 +1035,7 @@ body.dark-mode .dropdown-hint {{
       }}
       return {{ normStr, map }};
     }}
-    
+
     // 3) 在归一化串里找所有命中区间
     function findAll(haystack, needle) {{
       const hits = [];
@@ -936,7 +1047,7 @@ body.dark-mode .dropdown-hint {{
       }}
       return hits;
     }}
-    
+
 // 用归一化索引在“单个文本节点”内高亮，不破坏外层 DOM 结构
 function highlightOneTextNode(node, keyword) {{
   const raw = node.nodeValue;
@@ -1009,7 +1120,7 @@ function highlightNormalized(el, keyword) {{
   nodes.forEach(textNode => highlightOneTextNode(textNode, keyword));
 }}
 
-    
+
     function escapeRegExp(s) {{
       // 标准写法：把正则特殊字符全部转义
       return s.replace(/[.*+?^${{}}()|[\\]\\]/g, '\\$&');
@@ -1136,8 +1247,12 @@ function highlightNormalized(el, keyword) {{
   if (dropdown && dropdown.value !== "") {{
     const idx = parseInt(dropdown.value, 10);
     const container = document.getElementById('articleComments');
-    container.innerHTML = articlesData[idx].comments_html; // 直接回到原始 HTML
-    initOriginalText(container);
+
+    // ✅ 防止浏览器从缓存恢复后，下拉框里的旧索引已经失效，导致 JS 报错
+    if (!isNaN(idx) && idx >= 0 && idx < articlesData.length && container) {{
+      container.innerHTML = articlesData[idx].comments_html; // 直接回到原始 HTML
+      initOriginalText(container);
+    }}
   }}
 
   // 2) 搜索结果区域：按当前分页/排序/过滤重新渲染
@@ -1163,16 +1278,38 @@ function highlightNormalized(el, keyword) {{
     const resultsPerPage = 5;
 
     function toggleSearchButton() {{
-      const keyword = document.getElementById('searchKeyword').value.trim();
-      document.getElementById('searchButton').disabled = (keyword === "");
+      const keywordInput = document.getElementById('searchKeyword');
+      const searchButton = document.getElementById('searchButton');
+      if (!keywordInput || !searchButton) return;
+
+      const keyword = keywordInput.value.trim();
+      searchButton.disabled = (keyword === "");
     }}
 
     function showLoading() {{
-      document.getElementById('loadingIndicator').style.display = 'block';
+      const loading = document.getElementById('loadingIndicator');
+      if (loading) loading.style.display = 'block';
     }}
 
     function hideLoading() {{
-      document.getElementById('loadingIndicator').style.display = 'none';
+      const loading = document.getElementById('loadingIndicator');
+      if (loading) loading.style.display = 'none';
+    }}
+
+    // ✅ 新增：页面从后台/浏览器缓存恢复后，重新同步搜索按钮状态
+    function syncPageAfterRestore() {{
+      try {{
+        toggleSearchButton();
+        hideLoading();
+
+        const keywordInput = document.getElementById('searchKeyword');
+        const searchButton = document.getElementById('searchButton');
+        if (keywordInput && searchButton) {{
+          searchButton.disabled = (keywordInput.value.trim() === "");
+        }}
+      }} catch (err) {{
+        console.error("恢复页面状态失败：", err);
+      }}
     }}
 
 
@@ -1501,7 +1638,7 @@ if (searchType === 'article') {{
                   articleHeader.classList.add('article-search-highlight');
                   articleHeader.onclick = function() {{ removeArticleHighlight(articleHeader); }};
                 }}
-            
+
             // 正文
             if (result.foundInContent && articleContent) {{
               if (!articleContent.dataset.rawHtml) {{ articleContent.dataset.rawHtml = articleContent.innerHTML; }}
@@ -1677,6 +1814,70 @@ function removeHighlight(commentElem) {{
       window.scrollTo({{top: 0, behavior: 'smooth'}});
     }}
 
+    // 右侧工具栏：跳到搜索框并聚焦
+    function focusSearchBox() {{
+      const input = document.getElementById('searchKeyword');
+      window.scrollTo({{ top: 0, behavior: 'smooth' }});
+      setTimeout(function() {{
+        if (input) {{
+          input.focus();
+          input.select();
+        }}
+      }}, 250);
+    }}
+
+    // 右侧工具栏：跳到文章下拉选择区域
+    function scrollToArticleSelector() {{
+      const dropdown = document.getElementById('articleDropdown');
+      if (!dropdown) return;
+      const headerOffset = 80;
+      const elementPosition = dropdown.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({{ top: offsetPosition, behavior: 'smooth' }});
+      setTimeout(function() {{ dropdown.focus(); }}, 250);
+    }}
+
+    // 右侧快捷工具栏：隐藏 / 展开，并记住状态
+    function toggleSideTools() {{
+      const tools = document.getElementById('sideTools');
+      if (!tools) return;
+
+      tools.classList.toggle('collapsed');
+
+      const toggleBtn = tools.querySelector('.side-tools-toggle');
+      const isCollapsed = tools.classList.contains('collapsed');
+
+      if (toggleBtn) {{
+        toggleBtn.innerHTML = isCollapsed ? '☰' : '◀';
+        toggleBtn.title = isCollapsed ? '展开快捷工具' : '隐藏快捷工具';
+      }}
+
+      localStorage.setItem('sideToolsCollapsed', isCollapsed ? '1' : '0');
+    }}
+
+    // 页面打开时，恢复上次的隐藏状态
+    function restoreSideToolsState() {{
+      const tools = document.getElementById('sideTools');
+      if (!tools) return;
+
+      const saved = localStorage.getItem('sideToolsCollapsed');
+      const toggleBtn = tools.querySelector('.side-tools-toggle');
+
+      if (saved === '1') {{
+        tools.classList.add('collapsed');
+        if (toggleBtn) {{
+          toggleBtn.innerHTML = '☰';
+          toggleBtn.title = '展开快捷工具';
+        }}
+      }} else {{
+        tools.classList.remove('collapsed');
+        if (toggleBtn) {{
+          toggleBtn.innerHTML = '◀';
+          toggleBtn.title = '隐藏快捷工具';
+        }}
+      }}
+    }}
+
     /* ---------------- 文章选择及分页 ---------------- */
     const articlesData = {articles_json};
     const articlesPerPage = 10;
@@ -1688,9 +1889,27 @@ function persistArticleState(index) {{
 }}
 
 function initArticlePage() {{
-  const totalPages = Math.ceil(articlesData.length / articlesPerPage);
-  let savedIndex = parseInt(localStorage.getItem('savedArticleIndex'));
-  let savedPage  = parseInt(localStorage.getItem('savedArticlePage'));
+  const dropdown = document.getElementById('articleDropdown');
+  const articleCommentsElem = document.getElementById('articleComments');
+
+  if (!dropdown || !articleCommentsElem) return;
+
+  // ✅ 防止没有文章数据时，后面继续执行导致报错
+  if (!articlesData || articlesData.length === 0) {{
+    dropdown.innerHTML = "";
+    articleCommentsElem.innerHTML = "<p style='text-align:center;'>暂无文章数据</p>";
+    return;
+  }}
+
+  const totalPages = Math.max(1, Math.ceil(articlesData.length / articlesPerPage));
+  let savedIndex = parseInt(localStorage.getItem('savedArticleIndex'), 10);
+  let savedPage  = parseInt(localStorage.getItem('savedArticlePage'), 10);
+
+  // ✅ 防止 localStorage 里保存的是旧文章索引，文章数量变化后索引越界
+  if (isNaN(savedIndex) || savedIndex < 0 || savedIndex >= articlesData.length) {{
+    savedIndex = NaN;
+    localStorage.removeItem('savedArticleIndex');
+  }}
 
   // 优先根据“索引”反推出“页号”，确保两者一致
   if (!isNaN(savedIndex)) {{
@@ -1701,11 +1920,13 @@ function initArticlePage() {{
     currentArticlePage = 1;
   }}
 
+  // 再保险：页号也做范围限制
+  if (currentArticlePage < 1) currentArticlePage = 1;
+  if (currentArticlePage > totalPages) currentArticlePage = totalPages;
+
   // 渲染分页与下拉
   displayArticlePagination();
   populateArticleDropdown();
-
-  const dropdown = document.getElementById('articleDropdown');
 
   if (!isNaN(savedIndex)) {{
     // 如果当前页里没有这个索引，对齐到索引所在页并重新生成选项
@@ -1713,7 +1934,7 @@ function initArticlePage() {{
       currentArticlePage = Math.floor(savedIndex / articlesPerPage) + 1;
       populateArticleDropdown();
     }}
-    dropdown.value = savedIndex;
+    dropdown.value = String(savedIndex);
   }} else {{
     dropdown.selectedIndex = 0;
   }}
@@ -1760,13 +1981,28 @@ function populateArticleDropdown() {{
 
 function changeArticle() {{
   const dropdown = document.getElementById('articleDropdown');
-  const articleIndex = parseInt(dropdown.value);
+  const articleCommentsElem = document.getElementById('articleComments');
+  if (!dropdown || !articleCommentsElem) return;
+
+  let articleIndex = parseInt(dropdown.value, 10);
+
+  // ✅ 防止浏览器恢复页面后，旧索引失效导致 article 是 undefined
+  if (isNaN(articleIndex) || articleIndex < 0 || articleIndex >= articlesData.length) {{
+    console.warn("文章索引无效，已自动回到第一篇：", articleIndex);
+    articleIndex = 0;
+    dropdown.selectedIndex = 0;
+    dropdown.value = "0";
+  }}
+
+  const article = articlesData[articleIndex];
+  if (!article) {{
+    articleCommentsElem.innerHTML = "<p style='text-align:center;'>文章数据读取失败，请刷新页面重试。</p>";
+    return;
+  }}
 
   // 立刻把“当前文章索引 & 页号”写入 localStorage，防止返回后丢失
   persistArticleState(articleIndex);
 
-  const article = articlesData[articleIndex];
-  const articleCommentsElem = document.getElementById('articleComments');
   articleCommentsElem.innerHTML = article.comments_html;
 
   initOriginalText(articleCommentsElem);
@@ -2094,40 +2330,62 @@ const themeSettings = {{
     }});
 
     window.onload = function() {{
-      initOriginalText(document.body);
-      const settings = localStorage.getItem('userSettings');
-      if(settings) {{
-        const obj = JSON.parse(settings);
-        document.getElementById('fontSizeInput').value = obj.fontSize;
-        document.getElementById('fontSizeVal').innerText = obj.fontSize;
-        document.getElementById('lineHeightInput').value = obj.lineHeight;
-        document.getElementById('fontFamilySelect').value = obj.fontFamily;
-        document.getElementById('textColorInput').value = obj.textColor;
-        document.getElementById('themeSelect').value = obj.theme || "none";
-        document.getElementById('layoutStyleSelect').value = obj.layoutStyle || "card";
-        applySettings();
+      try {{
+        initOriginalText(document.body);
+        const settings = localStorage.getItem('userSettings');
+        if(settings) {{
+          const obj = JSON.parse(settings);
+          document.getElementById('fontSizeInput').value = obj.fontSize;
+          document.getElementById('fontSizeVal').innerText = obj.fontSize;
+          document.getElementById('lineHeightInput').value = obj.lineHeight;
+          document.getElementById('fontFamilySelect').value = obj.fontFamily;
+          document.getElementById('textColorInput').value = obj.textColor;
+          document.getElementById('themeSelect').value = obj.theme || "none";
+          document.getElementById('layoutStyleSelect').value = obj.layoutStyle || "card";
+          applySettings();
+        }}
+        const savedArticlePage = localStorage.getItem('savedArticlePage');
+        if(savedArticlePage !== null) {{
+           currentArticlePage = parseInt(savedArticlePage, 10);
+        }}
+        initArticlePage();
+        document.querySelectorAll('.comment .comment-text a').forEach(function(a) {{
+          a.target = '_blank';
+        }});
+        applyLanguageToNode(document.body);
+        restoreSideToolsState();
+        syncPageAfterRestore();
+      }} catch (err) {{
+        console.error("页面初始化失败：", err);
+        syncPageAfterRestore();
       }}
-      const savedArticlePage = localStorage.getItem('savedArticlePage');
-      if(savedArticlePage !== null) {{
-         currentArticlePage = parseInt(savedArticlePage);
-      }}
-      initArticlePage();
-      document.querySelectorAll('.comment .comment-text a').forEach(function(a) {{
-        a.target = '_blank';
-      }});
-      applyLanguageToNode(document.body);
     }}
 
     let currentColor = "white";
     function toggleDarkMode() {{
       document.body.classList.toggle('dark-mode');
     }}
-    // 从 bfcache 返回时，按本地状态再对齐一次
+    // ✅ 从 bfcache 返回时，按本地状态再对齐一次
+    // 解决：切到别的页面/后台一段时间后回来，搜索按钮点击没反应，需要刷新页面的问题
     window.addEventListener('pageshow', function (e) {{
-  if (e.persisted) {{
-    initArticlePage();
-  }}
-}});
+      syncPageAfterRestore();
+
+      if (e.persisted) {{
+        try {{
+          initArticlePage();
+        }} catch (err) {{
+          console.error("从浏览器缓存恢复页面时失败：", err);
+        }}
+        syncPageAfterRestore();
+      }}
+    }});
+
+    // ✅ 有些浏览器不是走 pageshow，而是走可见性恢复；这里再补一层保险
+    document.addEventListener('visibilitychange', function () {{
+      if (!document.hidden) {{
+        syncPageAfterRestore();
+      }}
+    }});
 
   </script>
 </body>
